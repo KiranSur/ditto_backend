@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer
+
 import torch
 from networks import define_G
 from PIL import Image
@@ -58,6 +60,18 @@ db = firestore.client()
 collection = db.collection('pokemon')
 db_values_collection = db.collection('db_values')
 
+# set up API keys and authorization
+api_keys = [os.environ.get("api_key1")]
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# code from https://testdriven.io/tips/6840e037-4b8f-4354-a9af-6863fb1c69eb/
+def api_key_auth(api_key: str = Depends(oauth2_scheme)):
+    if api_key not in api_keys:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API Key"
+        )
+
 # set up model to generate pokemon
 model_dict = torch.load("model.pth")
 
@@ -72,7 +86,7 @@ encode = transforms.Compose([
 ])
 
 # returns two random pet image storage url's
-@app.get('/randomtwo/')
+@app.get('/randomtwo/', dependencies=[Depends(api_key_auth)])
 async def random_two():
     # get current number of generated pokemon
     num_pokemon = db_values_collection.document('totals').get().to_dict()['num_pokemon']
@@ -86,7 +100,7 @@ async def random_two():
     return res
 
 # returns the storage url's for the top ten pokemon
-@app.get('/topten')
+@app.get('/topten', dependencies=[Depends(api_key_auth)])
 async def top_ten():
     top_ten_pokemon = collection.order_by('elo', direction=firestore.Query.DESCENDING).limit(10).get()
     res = {}
@@ -99,11 +113,11 @@ async def top_ten():
 class PetImage(BaseModel):
     name: str
 
-@app.post('/generate/')
+@app.post('/generate/', dependencies=[Depends(api_key_auth)])
 async def translate_pokemon(pet_image : PetImage):
     # check if pokemon with this name already exists
     if collection.document(pet_image.name).get().exists:
-        raise HTTPException(status_code=403, detail="Pokemon With This Name Already Exists")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Pokemon With This Name Already Exists")
 
     # get image from firebase and transform it
     blob = bucket.get_blob("Pets/" + pet_image.name)
@@ -147,7 +161,7 @@ class ComparePetElo(BaseModel):
     name2: str
     winner: int
 
-@app.post('/updateelo/')
+@app.post('/updateelo/', dependencies=[Depends(api_key_auth)])
 async def translate_pokemon(comparison : ComparePetElo):
     # uses ELO rating system from https://en.wikipedia.org/wiki/Elo_rating_system
 
