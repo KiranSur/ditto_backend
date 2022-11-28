@@ -52,8 +52,7 @@ encode = transforms.Compose([
     transforms.Resize((256, 256))
 ])
 
-encode = transforms.ToTensor()
-
+# set up PetImage class with PyDantic
 class PetImage(BaseModel):
     name: str
 
@@ -70,13 +69,13 @@ async def translate_pokemon(pet_image : PetImage):
 
     # create name for new pokemon image
     tmp = pet_image.name.split(".")
-    res_name_start = "".join(tmp[:-1])
-    res_name = res_name_start + "_converted." + tmp[-1]
+    res_name = "".join(tmp[:-1]) + "_converted." + tmp[-1]
 
     # set db values for new pokemon
-    collection.document(res_name_start).set({
+    pokemon_storage_url = storage_url + "/Pokemon/" + res_name
+    collection.document(pet_image.name).set({
         'elo' : 1600,
-        'storage_url' : storage_url + "/Pokemon/" + res_name
+        'storage_url' : pokemon_storage_url
     })
 
     # upload image to firebase
@@ -84,5 +83,50 @@ async def translate_pokemon(pet_image : PetImage):
     blob = bucket.blob("Pokemon/" + res_name)
     blob.upload_from_filename("./tmp_files/tmp_image.png")
 
-    return {"pokemon_image_name" : res_name}
+    return {"storage_url" : pokemon_storage_url}
+
+# set up ComparePetElo class with PyDantic
+class ComparePetElo(BaseModel):
+    name1: str
+    name2: str
+    winner: int
+
+@app.post('/updateelo/')
+async def translate_pokemon(comparison : ComparePetElo):
+    # uses ELO rating system from https://en.wikipedia.org/wiki/Elo_rating_system
+
+    pokemon_1 = collection.document(comparison.name1).get().to_dict()
+    pokemon_2 = collection.document(comparison.name1).get().to_dict()
+
+    scoring_pt1 = 0
+    scoring_pt2 = 0
+
+    old_elo1 = pokemon_1['elo']
+    old_elo2 = pokemon_2['elo']
+
+    win_prob1 = 1 / (10 ** ((old_elo2 - old_elo1) / 400) + 1)
+    win_prob2 = 1 / (10 ** ((old_elo1 - old_elo2) / 400) + 1)
+
+    if comparison.winner == 0.5:
+        scoring_pt1, scoring_pt2 = 0.5, 0.5
+    elif comparison.winner == 0:
+        scoring_pt1 = 1
+    else:
+        scoring_pt2 = 1
+
+    new_elo1 = old_elo1 + 20 * (scoring_pt1-win_prob1)
+    new_elo2 = old_elo2 + 20 * (scoring_pt2-win_prob2)
+    
+    pokemon_1_elo_jump = new_elo1 - old_elo1
+    pokemon_2_elo_jump = new_elo2 - old_elo2
+
+    # set new elos in db
+    collection.document(comparison.name1).update({
+        'elo' : new_elo1
+    })
+    collection.document(comparison.name2).update({
+        'elo' : new_elo2
+    })
+
+    return {"Pokemon_1_Elo_Jump" : pokemon_1_elo_jump, "Pokemon_2_Elo_Jump" : pokemon_2_elo_jump,}
 
