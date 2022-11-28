@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import torch
 from networks import define_G
 from PIL import Image
 from torchvision import transforms
 from torchvision.utils import save_image
+import random
 
 import firebase_admin
 from firebase_admin import credentials, storage, firestore
@@ -38,6 +39,7 @@ storage_url = 'gs://ditto-f2ed7.appspot.com'
 bucket = storage.bucket()
 db = firestore.client()
 collection = db.collection('pokemon')
+db_values_collection = db.collection('db_values')
 
 # set up model to generate pokemon
 model_dict = torch.load("model.pth")
@@ -52,12 +54,40 @@ encode = transforms.Compose([
     transforms.Resize((256, 256))
 ])
 
+# returns two random pet image storage url's
+@app.get('/randomtwo/')
+async def random_two():
+    # get current number of generated pokemon
+    num_pokemon = db_values_collection.document('totals').get().to_dict()['num_pokemon']
+
+    # sample two random pokemon
+    picked = random.sample(range(1, num_pokemon+1), 2)
+    res = {}
+    res[1] = collection.where('id', '==', picked[0]).limit(1).get()[0].get('storage_url')
+    res[2] = collection.where('id', '==', picked[1]).limit(1).get()[0].get('storage_url')
+
+    return res
+
+# returns the storage url's for the top ten pokemon
+@app.get('/topten')
+async def top_ten():
+    top_ten_pokemon = collection.order_by('elo', direction=firestore.Query.DESCENDING).limit(10).get()
+    res = {}
+    for i in range(len(top_ten_pokemon)):
+        res[i+1] = top_ten_pokemon[i].get('storage_url')
+    
+    return res
+
 # set up PetImage class with PyDantic
 class PetImage(BaseModel):
     name: str
 
 @app.post('/generate/')
 async def translate_pokemon(pet_image : PetImage):
+    # check if pokemon with this name already exists
+    if collection.document(pet_image.name).get().exists:
+        raise HTTPException(status_code=403, detail="Pokemon With This Name Already Exists")
+
     # get image from firebase and transform it
     blob = bucket.get_blob("Pets/" + pet_image.name)
     blob.download_to_filename(r"./tmp_files/tmp_image.png")
@@ -71,11 +101,20 @@ async def translate_pokemon(pet_image : PetImage):
     tmp = pet_image.name.split(".")
     res_name = "".join(tmp[:-1]) + "_converted." + tmp[-1]
 
+    # get current number of generated pokemon
+    num_pokemon = db_values_collection.document('totals').get().to_dict()['num_pokemon']
+
     # set db values for new pokemon
     pokemon_storage_url = storage_url + "/Pokemon/" + res_name
     collection.document(pet_image.name).set({
         'elo' : 1600,
-        'storage_url' : pokemon_storage_url
+        'storage_url' : pokemon_storage_url,
+        'id' : num_pokemon + 1
+    })
+
+    # increment total number of generated pokemon
+    db_values_collection.document('totals').update({
+        'num_pokemon' : num_pokemon + 1
     })
 
     # upload image to firebase
