@@ -10,6 +10,8 @@ import firebase_admin
 from firebase_admin import credentials, storage, firestore
 from pydantic import BaseModel
 import numpy as np
+import os
+from dotenv import load_dotenv
 
 # structure:
 # firebase storage: stores regular and translated images
@@ -32,8 +34,23 @@ import numpy as np
 # set up FastAPI
 app = FastAPI()
 
+# set up key
+load_dotenv()
+KEY = {
+    "type": os.environ.get("type"),
+    "project_id": os.environ.get("project_id"),
+    "private_key_id": os.environ.get("private_key_id"),
+    "private_key": os.environ.get("private_key").replace(r'\n', '\n'),
+    "client_email": os.environ.get("client_email"),
+    "client_id": os.environ.get("client_id"),
+    "auth_uri": os.environ.get("auth_uri"),
+    "token_uri": os.environ.get("token_uri"),
+    "auth_provider_x509_cert_url": os.environ.get("auth_provider_x509_cert_url"),
+    "client_x509_cert_url": os.environ.get("client_x509_cert_url")
+}
+
 # set up Firebase access
-cred = credentials.Certificate("key.json")
+cred = credentials.Certificate(KEY)
 fb_app = firebase_admin.initialize_app(cred, {'storageBucket' : 'ditto-f2ed7.appspot.com'})
 storage_url = 'gs://ditto-f2ed7.appspot.com'
 bucket = storage.bucket()
