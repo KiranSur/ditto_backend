@@ -128,7 +128,7 @@ async def translate_pokemon(pet_image : PetImage):
     # get image from firebase and transform it
     blob = bucket.get_blob("Pets/" + pet_image.name)
     blob.download_to_filename(r"./tmp_files/tmp_image.png")
-    image = encode(Image.open("./tmp_files/tmp_image.png"))
+    image = encode(Image.open("./tmp_files/tmp_image.png").convert('RGB'))
 
     # evaluate model on pet image
     with torch.no_grad():
