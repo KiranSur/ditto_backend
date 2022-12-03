@@ -21,9 +21,10 @@ from dotenv import load_dotenv
 #
 # two operations: get and post
 #
-# get: (has two different operations)
+# get: (has three different operations)
 # (1) returns the names of two random translated pokemon images (for comparison game)
 # (2) returns the top 10 pokemon and their elos
+# (3) returns the current number of pokemon
 #
 # post: (has two different operations)
 # (1) takes in the image names of two pokemon and whichever one was picked as 
@@ -54,7 +55,6 @@ KEY = {
 # set up Firebase access
 cred = credentials.Certificate(KEY)
 fb_app = firebase_admin.initialize_app(cred, {'storageBucket' : 'ditto-f2ed7.appspot.com'})
-storage_url = 'gs://ditto-f2ed7.appspot.com'
 bucket = storage.bucket()
 db = firestore.client()
 collection = db.collection('pokemon')
@@ -94,19 +94,25 @@ async def random_two():
     # sample two random pokemon
     picked = random.sample(range(1, num_pokemon+1), 2)
     res = {}
-    res[1] = collection.where('id', '==', picked[0]).limit(1).get()[0].get('storage_url')
-    res[2] = collection.where('id', '==', picked[1]).limit(1).get()[0].get('storage_url')
+    res[1] = collection.where('id', '==', picked[0]).limit(1).get()[0].get('public_url')
+    res[2] = collection.where('id', '==', picked[1]).limit(1).get()[0].get('public_url')
 
     return res
 
 # returns the storage url's for the top ten pokemon
-@app.get('/topten', dependencies=[Depends(api_key_auth)])
+@app.get('/topten/', dependencies=[Depends(api_key_auth)])
 async def top_ten():
     top_ten_pokemon = collection.order_by('elo', direction=firestore.Query.DESCENDING).limit(10).get()
     res = {}
     for i in range(len(top_ten_pokemon)):
-        res[i+1] = top_ten_pokemon[i].get('storage_url')
+        res[i+1] = top_ten_pokemon[i].get('public_url')
     
+    return res
+
+# returns the current # of pokemon
+@app.get('/numpokemon/', dependencies=[Depends(api_key_auth)])
+async def num_pokemon():
+    res = num_pokemon = db_values_collection.document('totals').get().to_dict()['num_pokemon']
     return res
 
 # set up PetImage class with PyDantic
@@ -135,11 +141,17 @@ async def translate_pokemon(pet_image : PetImage):
     # get current number of generated pokemon
     num_pokemon = db_values_collection.document('totals').get().to_dict()['num_pokemon']
 
+    # upload image to firebase
+    save_image(res, "./tmp_files/tmp_image.png")
+    blob = bucket.blob("Pokemon/" + res_name)
+    blob.upload_from_filename("./tmp_files/tmp_image.png")
+    blob.make_public()
+    public_url = blob.public_url
+
     # set db values for new pokemon
-    pokemon_storage_url = storage_url + "/Pokemon/" + res_name
     collection.document(pet_image.name).set({
         'elo' : 1600,
-        'storage_url' : pokemon_storage_url,
+        'public_url' : public_url,
         'id' : num_pokemon + 1
     })
 
@@ -148,12 +160,7 @@ async def translate_pokemon(pet_image : PetImage):
         'num_pokemon' : num_pokemon + 1
     })
 
-    # upload image to firebase
-    save_image(res, "./tmp_files/tmp_image.png")
-    blob = bucket.blob("Pokemon/" + res_name)
-    blob.upload_from_filename("./tmp_files/tmp_image.png")
-
-    return {"storage_url" : pokemon_storage_url}
+    return {"public_url" : public_url}
 
 # set up ComparePetElo class with PyDantic
 class ComparePetElo(BaseModel):
