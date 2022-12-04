@@ -110,8 +110,9 @@ async def top_ten():
     top_ten_pokemon = collection.order_by('elo', direction=firestore.Query.DESCENDING).limit(10).get()
     res = {}
     for i in range(len(top_ten_pokemon)):
-        res[i+1] = top_ten_pokemon[i].get('public_url')
-    
+        # res[str(i)] = top_ten_pokemon[i].get('public_url')
+        # res[str(i) + "_elo"] = top_ten_pokemon[i].get('elo')
+        res[i] = [top_ten_pokemon[i].get('public_url'), top_ten_pokemon[i].get('elo')]
     return res
 
 # returns the current # of pokemon
