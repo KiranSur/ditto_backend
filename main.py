@@ -93,11 +93,16 @@ async def random_two():
 
     # sample two random pokemon
     picked = random.sample(range(1, num_pokemon+1), 2)
-    res = {}
-    res[1] = collection.where('id', '==', picked[0]).limit(1).get()[0].get('public_url')
-    res[2] = collection.where('id', '==', picked[1]).limit(1).get()[0].get('public_url')
+    res1 = collection.where('id', '==', picked[0]).limit(1).get()[0]
+    res2 = collection.where('id', '==', picked[1]).limit(1).get()[0]
 
-    return res
+    name1 = res1.id
+    name2 = res2.id
+
+    url1 = res1.get('public_url')
+    url2 = res2.get('public_url')
+
+    return {"name1" : name1, "url1" : url1, "name2" : name2, "url2" : url2}
 
 # returns the storage url's for the top ten pokemon
 @app.get('/topten/', dependencies=[Depends(api_key_auth)])
