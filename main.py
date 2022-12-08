@@ -15,7 +15,8 @@ import numpy as np
 import os
 from dotenv import load_dotenv
 
-from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 
 # structure:
 # firebase storage: stores regular and translated images
@@ -36,19 +37,19 @@ from fastapi.middleware.cors import CORSMiddleware
 #     pokemon to fb, adds db entry with pokemon image name and starting elo,
 #     post request returns name of translated pokemon in fb storage
 
-# set up FastAPI
-app = FastAPI()
+# set up Middleware
+middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=['https://ditto-wheat.vercel.app',],
+        allow_credentials=True,
+        allow_methods=['*'],
+        allow_headers=['*']
+    )
+]
 
-# set up CORS stuff
-origins=["https://ditto-wheat.vercel.app",
-         "http://localhost:8000"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# set up FastAPI
+app = FastAPI(middleware=middleware)
 
 # set up key
 load_dotenv()
