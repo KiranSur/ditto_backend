@@ -39,13 +39,17 @@ from fastapi.middleware.cors import CORSMiddleware
 # set up FastAPI
 app = FastAPI()
 
+# default get endpoint
+@app.get("/")
+def home():
+    return {"message" : "Health Check Passed!"}
+
 # set up CORS stuff
-origins=["https://ditto-wheat.vercel.app/randomtwo/"]
+origins=["https://ditto-wheat.vercel.app/",]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
