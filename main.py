@@ -45,11 +45,12 @@ def home():
     return {"message" : "Health Check Passed!"}
 
 # set up CORS stuff
-origins=["https://ditto-wheat.vercel.app/",]
+origins=["https://ditto-wheat.vercel.app/",
+        "https://ditto-wheat.vercel.app/battle"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
