@@ -40,7 +40,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
 # set up CORS stuff
-origins=["https://ditto-wheat.vercel.app"]
+origins=["https://ditto-wheat.vercel.app/randomtwo/"]
 
 app.add_middleware(
     CORSMiddleware,
