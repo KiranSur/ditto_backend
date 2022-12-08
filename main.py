@@ -49,9 +49,8 @@ origins=["https://ditto-wheat.vercel.app/",]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=origins,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -79,16 +78,16 @@ collection = db.collection('pokemon')
 db_values_collection = db.collection('db_values')
 
 # set up API keys and authorization
-api_keys = [os.environ.get("api_key1")]
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# api_keys = [os.environ.get("api_key1")]
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # code from https://testdriven.io/tips/6840e037-4b8f-4354-a9af-6863fb1c69eb/
-def api_key_auth(api_key: str = Depends(oauth2_scheme)):
-    if api_key not in api_keys:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API Key"
-        )
+# def api_key_auth(api_key: str = Depends(oauth2_scheme)):
+#     if api_key not in api_keys:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Invalid API Key"
+#         )
 
 # set up model to generate pokemon
 model_dict = torch.load("model.pth")
@@ -104,7 +103,7 @@ encode = transforms.Compose([
 ])
 
 # returns two random pet image storage url's
-@app.get('/randomtwo/', dependencies=[Depends(api_key_auth)])
+@app.get('/randomtwo/')
 async def random_two():
     # get current number of generated pokemon
     num_pokemon = db_values_collection.document('totals').get().to_dict()['num_pokemon']
@@ -126,7 +125,7 @@ async def random_two():
     return {"name1" : name1, "url1" : url1, "elo1" : elo1, "name2" : name2, "url2" : url2, "elo2" : elo2}
 
 # returns the storage url's for the top ten pokemon
-@app.get('/topten/', dependencies=[Depends(api_key_auth)])
+@app.get('/topten/')
 async def top_ten():
     top_ten_pokemon = collection.order_by('elo', direction=firestore.Query.DESCENDING).limit(10).get()
     res = {}
@@ -137,7 +136,7 @@ async def top_ten():
     return res
 
 # returns the current # of pokemon
-@app.get('/numpokemon/', dependencies=[Depends(api_key_auth)])
+@app.get('/numpokemon/')
 async def num_pokemon():
     res = num_pokemon = db_values_collection.document('totals').get().to_dict()['num_pokemon']
     return res
@@ -146,7 +145,7 @@ async def num_pokemon():
 class PetImage(BaseModel):
     name: str
 
-@app.post('/generate/', dependencies=[Depends(api_key_auth)])
+@app.post('/generate/')
 async def translate_pokemon(pet_image : PetImage):
     # check if pokemon with this name already exists
     if collection.document(pet_image.name).get().exists:
@@ -195,7 +194,7 @@ class ComparePetElo(BaseModel):
     name2: str
     winner: int
 
-@app.post('/updateelo/', dependencies=[Depends(api_key_auth)])
+@app.post('/updateelo/')
 async def translate_pokemon(comparison : ComparePetElo):
     # uses ELO rating system from https://en.wikipedia.org/wiki/Elo_rating_system
 
