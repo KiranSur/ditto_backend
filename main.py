@@ -15,6 +15,8 @@ import numpy as np
 import os
 from dotenv import load_dotenv
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # structure:
 # firebase storage: stores regular and translated images
 # db entries: pokemon image names and associated elos
@@ -36,6 +38,15 @@ from dotenv import load_dotenv
 
 # set up FastAPI
 app = FastAPI()
+
+# set up CORS stuff
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # set up key
 load_dotenv()
@@ -102,7 +113,10 @@ async def random_two():
     url1 = res1.get('public_url')
     url2 = res2.get('public_url')
 
-    return {"name1" : name1, "url1" : url1, "name2" : name2, "url2" : url2}
+    elo1 = res1.get('elo')
+    elo2 = res2.get('elo')
+
+    return {"name1" : name1, "url1" : url1, "elo1" : elo1, "name2" : name2, "url2" : url2, "elo2" : elo2}
 
 # returns the storage url's for the top ten pokemon
 @app.get('/topten/', dependencies=[Depends(api_key_auth)])
